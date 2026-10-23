@@ -1,6 +1,13 @@
 import React from 'react';
 
-export default function Header({ activeTab, setActiveTab, totalReviews, onResetQueue }) {
+export default function Header({
+  activeTab,
+  setActiveTab,
+  totalReviews,
+  onResetQueue,
+  currentUser,
+  onLogout,
+}) {
   return (
     <header className="app-header">
       <div className="header-container">
@@ -20,6 +27,7 @@ export default function Header({ activeTab, setActiveTab, totalReviews, onResetQ
               <span className="status-dot"></span>
               <span><strong>{totalReviews}</strong> Reviews Live</span>
             </div>
+
             <button
               className="status-pill"
               onClick={onResetQueue}
@@ -28,6 +36,23 @@ export default function Header({ activeTab, setActiveTab, totalReviews, onResetQ
             >
               <span>🔄 Reset Queue</span>
             </button>
+
+            {currentUser && (
+              <div className="user-session-badge" title={`Authenticated as ${currentUser.username || 'Admin'}`}>
+                <span className="user-avatar-dot"></span>
+                <span>👤 {currentUser.username || 'admin'}</span>
+              </div>
+            )}
+
+            {onLogout && (
+              <button
+                className="btn-logout"
+                onClick={onLogout}
+                title="Log out and lock dashboard"
+              >
+                <span>🚪 Logout</span>
+              </button>
+            )}
           </div>
         </div>
 

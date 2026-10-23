@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import initialAccounts from './data/accounts.json';
 import initialReviews from './data/reviews.json';
 import Header from './components/Header.jsx';
 import GeneratorView from './components/GeneratorView.jsx';
 import DatabaseView from './components/DatabaseView.jsx';
 import RecipientView from './components/RecipientView.jsx';
+import LoginView from './components/LoginView.jsx';
 
 // UTF-8 safe base64 encoding & decoding
 export function encodePayload(obj) {
@@ -46,16 +47,49 @@ export default function App() {
   const [recipientPayload, setRecipientPayload] = useState(null);
   const [isRecipientMode, setIsRecipientMode] = useState(false);
 
-  // Show Toast
+  // Authentication State
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem('reviewflow_token') || '');
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('reviewflow_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Show Toast helper
   const showToast = (message, icon = '✓') => {
     setToast({ message, icon });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Fetch from Node + NoSQL API
-  const refreshFromBackend = async () => {
+  // Logout handler
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('reviewflow_token');
+    localStorage.removeItem('reviewflow_user');
+    setAuthToken('');
+    setCurrentUser(null);
+    showToast('Dashboard locked. Session terminated safely.', '🔒');
+  }, []);
+
+  // Fetch accounts from Node + NoSQL API with Auth
+  const refreshFromBackend = useCallback(async (tokenToUse) => {
+    const activeToken = tokenToUse || authToken;
+    if (!activeToken) return;
+
     try {
-      const accRes = await fetch('/api/accounts');
+      const accRes = await fetch('/api/accounts', {
+        headers: {
+          'Authorization': `Bearer ${activeToken}`,
+        },
+      });
+
+      if (accRes.status === 401 || accRes.status === 403) {
+        handleLogout();
+        return;
+      }
+
       if (accRes.ok) {
         const accData = await accRes.json();
         if (Array.isArray(accData) && accData.length > 0) {
@@ -65,15 +99,59 @@ export default function App() {
     } catch (e) {
       // Backend offline, fallback to local state
     }
+  }, [authToken, handleLogout]);
+
+  // Handle successful login
+  const handleLoginSuccess = (token, user) => {
+    localStorage.setItem('reviewflow_token', token);
+    localStorage.setItem('reviewflow_user', JSON.stringify(user));
+    setAuthToken(token);
+    setCurrentUser(user);
+    showToast(`Access granted! Welcome, ${user.username}.`, '🛡️');
+    refreshFromBackend(token);
   };
 
-  // Check routes on initial load
+  // Verify stored token validity with backend on load
+  useEffect(() => {
+    const verifySavedToken = async () => {
+      const storedToken = localStorage.getItem('reviewflow_token');
+      if (!storedToken) return;
+
+      try {
+        const res = await fetch('/api/auth/verify', {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.valid && data.user) {
+            setCurrentUser(data.user);
+            setAuthToken(storedToken);
+            refreshFromBackend(storedToken);
+          } else {
+            handleLogout();
+          }
+        } else {
+          handleLogout();
+        }
+      } catch (e) {
+        // Network failure; keep local session
+      }
+    };
+
+    verifySavedToken();
+  }, [refreshFromBackend, handleLogout]);
+
+  // Check URL parameters on initial load
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const rParam = urlParams.get('r');
     const accountParam = urlParams.get('account') || urlParams.get('a');
     const idParam = urlParams.get('id');
 
+    // 1. Encoded recipient link
     if (rParam) {
       const payload = decodePayload(rParam);
       if (payload) {
@@ -83,6 +161,7 @@ export default function App() {
       }
     }
 
+    // 2. Rotating account link
     if (accountParam && !rParam) {
       const acc = accounts.find(a => a.id === accountParam) || accounts[0];
       const unposted = reviews.filter(r => r.accountId === acc.id && !r.isPosted);
@@ -100,6 +179,7 @@ export default function App() {
       return;
     }
 
+    // 3. Direct ID link
     if (idParam) {
       const rev = reviews.find(r => r.id === idParam);
       const acc = accounts.find(a => a.id === urlParams.get('a')) || accounts[0];
@@ -115,8 +195,11 @@ export default function App() {
       return;
     }
 
-    refreshFromBackend();
-  }, []);
+    // If on admin view and has token, refresh accounts
+    if (authToken) {
+      refreshFromBackend(authToken);
+    }
+  }, [authToken, refreshFromBackend]);
 
   // Update current review whenever account or mode changes
   useEffect(() => {
@@ -148,17 +231,20 @@ export default function App() {
     } else if (selectedMode === 'custom') {
       setCurrentReviewText(customReviewInput.trim() || 'Dignitary Defence Academy provides outstanding mentoring and fitness training.');
     }
-  }, [selectedAccountId, selectedMode, reviews]);
+  }, [selectedAccountId, selectedMode, reviews, isRecipientMode]);
 
   // Handle Mark Used / Advance queue
   const handleAdvanceQueue = async () => {
     if (!selectedReviewId) return;
 
-    // Call NoSQL backend
+    // Call NoSQL backend with auth token
     try {
       await fetch(`/api/reviews/advance/${selectedAccountId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
         body: JSON.stringify({ currentReviewId: selectedReviewId })
       });
     } catch (e) {}
@@ -171,10 +257,15 @@ export default function App() {
 
   // Handle Reset Queue
   const handleResetQueue = async () => {
-    if (!window.confirm('Reset all submitted reviews? This will restore all reviews back to the unposted queue.')) return;
+    if (!window.confirm('Reset all submitted reviews? This will restore all reviews back to the unposted queue in NoSQL DB.')) return;
 
     try {
-      await fetch('/api/reviews/reset', { method: 'POST' });
+      await fetch('/api/reviews/reset', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
     } catch (e) {}
 
     setReviews(JSON.parse(JSON.stringify(initialReviews)));
@@ -182,8 +273,30 @@ export default function App() {
     refreshFromBackend();
   };
 
+  // =====================================================================
+  // ROUTE 1: PUBLIC RECIPIENT MODE (Bypasses Login for Customers/Students)
+  // =====================================================================
   if (isRecipientMode && recipientPayload) {
-    return <RecipientView payload={recipientPayload} onRefresh={refreshFromBackend} />;
+    return <RecipientView payload={recipientPayload} onRefresh={() => {}} />;
+  }
+
+  // =====================================================================
+  // ROUTE 2: PROTECTED ADMIN DASHBOARD (Requires Valid Credentials)
+  // =====================================================================
+  if (!authToken) {
+    return (
+      <>
+        <LoginView onLoginSuccess={handleLoginSuccess} />
+        {toast && (
+          <div className="toast-container">
+            <div className="toast">
+              <span style={{ color: '#10b981', fontWeight: 'bold' }}>{toast.icon}</span>
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   const currentAcc = accounts.find(a => a.id === selectedAccountId) || accounts[0];
@@ -195,6 +308,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         totalReviews={reviews.length}
         onResetQueue={handleResetQueue}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       <main className="app-main">

@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { initDatabase, db } from './db/nosql.js';
+import { authenticateUser, createToken, verifyToken, requireAuth } from './auth.js';
 
 dotenv.config();
 
@@ -21,7 +22,51 @@ app.use(express.json());
 await initDatabase();
 
 // =====================================================================
-// API ROUTES
+// AUTHENTICATION ROUTES (Protects Dashboard)
+// =====================================================================
+
+// POST Login
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  const user = authenticateUser(username, password);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+
+  const token = createToken({ username: user.username, role: user.role });
+  res.json({
+    success: true,
+    token,
+    user: {
+      username: user.username,
+      role: user.role,
+    },
+  });
+});
+
+// GET Verify Auth Token
+app.get('/api/auth/verify', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return res.status(401).json({ valid: false, error: 'No token provided' });
+  }
+
+  const user = verifyToken(token);
+  if (!user) {
+    return res.status(401).json({ valid: false, error: 'Token is invalid or expired' });
+  }
+
+  res.json({ valid: true, user });
+});
+
+// =====================================================================
+// PUBLIC ROUTES (For Review Recipients / Customer Funnel)
 // =====================================================================
 
 // Health & DB Status
@@ -33,71 +78,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// GET Accounts with dynamic unposted counters
-app.get('/api/accounts', async (req, res) => {
-  try {
-    const accounts = await db.find('accounts');
-    const allReviews = await db.find('reviews');
-
-    const accountsWithStats = accounts.map(acc => {
-      const accReviews = allReviews.filter(r => r.accountId === acc.id);
-      const unpostedCount = accReviews.filter(r => !r.isPosted).length;
-      return {
-        ...acc,
-        reviewsCount: accReviews.length,
-        unpostedCount: unpostedCount,
-      };
-    });
-
-    res.json(accountsWithStats);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET Reviews with pagination, filters, and search
-app.get('/api/reviews', async (req, res) => {
-  try {
-    const { account, status, lang, search, page = 1, limit = 10 } = req.query;
-    let reviews = await db.find('reviews');
-
-    if (account && account !== 'all') {
-      reviews = reviews.filter(r => r.accountId === account);
-    }
-    if (status === 'unposted') {
-      reviews = reviews.filter(r => !r.isPosted);
-    } else if (status === 'posted') {
-      reviews = reviews.filter(r => r.isPosted);
-    }
-    if (lang && lang !== 'all') {
-      reviews = reviews.filter(r => r.language === lang);
-    }
-    if (search && search.trim()) {
-      const q = search.toLowerCase();
-      reviews = reviews.filter(r => 
-        (r.review && r.review.toLowerCase().includes(q)) || 
-        (r.accountName && r.accountName.toLowerCase().includes(q))
-      );
-    }
-
-    const total = reviews.length;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const startIndex = (pageNum - 1) * limitNum;
-    const paginated = reviews.slice(startIndex, startIndex + limitNum);
-
-    res.json({
-      total,
-      page: pageNum,
-      totalPages: Math.ceil(total / limitNum) || 1,
-      reviews: paginated,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET Next unposted review for a specific account
+// GET Next unposted review for a specific account (Public for dynamic review link)
 app.get('/api/reviews/next/:accountId', async (req, res) => {
   try {
     const { accountId } = req.params;
@@ -114,7 +95,7 @@ app.get('/api/reviews/next/:accountId', async (req, res) => {
   }
 });
 
-// POST Record Review Submission (Advances queue & saves to NoSQL submissions)
+// POST Record Review Submission (Public for recipient submission)
 app.post('/api/reviews/submit', async (req, res) => {
   try {
     const { reviewId, reviewText, accountId } = req.body;
@@ -158,8 +139,76 @@ app.post('/api/reviews/submit', async (req, res) => {
   }
 });
 
+// =====================================================================
+// PROTECTED DASHBOARD ROUTES (Require Admin Token)
+// =====================================================================
+
+// GET Accounts with dynamic unposted counters
+app.get('/api/accounts', requireAuth, async (req, res) => {
+  try {
+    const accounts = await db.find('accounts');
+    const allReviews = await db.find('reviews');
+
+    const accountsWithStats = accounts.map(acc => {
+      const accReviews = allReviews.filter(r => r.accountId === acc.id);
+      const unpostedCount = accReviews.filter(r => !r.isPosted).length;
+      return {
+        ...acc,
+        reviewsCount: accReviews.length,
+        unpostedCount: unpostedCount,
+      };
+    });
+
+    res.json(accountsWithStats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Reviews with pagination, filters, and search
+app.get('/api/reviews', requireAuth, async (req, res) => {
+  try {
+    const { account, status, lang, search, page = 1, limit = 10 } = req.query;
+    let reviews = await db.find('reviews');
+
+    if (account && account !== 'all') {
+      reviews = reviews.filter(r => r.accountId === account);
+    }
+    if (status === 'unposted') {
+      reviews = reviews.filter(r => !r.isPosted);
+    } else if (status === 'posted') {
+      reviews = reviews.filter(r => r.isPosted);
+    }
+    if (lang && lang !== 'all') {
+      reviews = reviews.filter(r => r.language === lang);
+    }
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      reviews = reviews.filter(r => 
+        (r.review && r.review.toLowerCase().includes(q)) || 
+        (r.accountName && r.accountName.toLowerCase().includes(q))
+      );
+    }
+
+    const total = reviews.length;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginated = reviews.slice(startIndex, startIndex + limitNum);
+
+    res.json({
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum) || 1,
+      reviews: paginated,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST Manually advance / mark as used
-app.post('/api/reviews/advance/:accountId', async (req, res) => {
+app.post('/api/reviews/advance/:accountId', requireAuth, async (req, res) => {
   try {
     const { accountId } = req.params;
     const { currentReviewId } = req.body;
@@ -182,7 +231,7 @@ app.post('/api/reviews/advance/:accountId', async (req, res) => {
 });
 
 // POST Reset submitted queue back to unposted
-app.post('/api/reviews/reset', async (req, res) => {
+app.post('/api/reviews/reset', requireAuth, async (req, res) => {
   try {
     await db.updateMany('reviews', {}, { isPosted: false, status: 'Not Posted' });
     res.json({ success: true, message: 'All reviews restored to unposted queue in NoSQL database' });
@@ -192,7 +241,7 @@ app.post('/api/reviews/reset', async (req, res) => {
 });
 
 // POST Track link generation
-app.post('/api/links/generate', async (req, res) => {
+app.post('/api/links/generate', requireAuth, async (req, res) => {
   try {
     const { accountId, url, mode } = req.body;
     const linkDoc = await db.insertOne('links', {
@@ -207,7 +256,9 @@ app.post('/api/links/generate', async (req, res) => {
   }
 });
 
-// Serve frontend in production
+// =====================================================================
+// FRONTEND SERVING (Production)
+// =====================================================================
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
