@@ -1,0 +1,38 @@
+[
+  {
+    "id": "dignitary_defence",
+    "name": "Dignitary Defence Academy",
+    "mapUrl": "https://www.google.com/maps/place/dignitary+defence+academy/@18.4698078,73.8533419,17z/data=!4m8!3m7!1s0x3bc2eabc881eb1ef:0x54ec69d75a2dfe08!8m2!3d18.4698078!4d73.8533419!9m1!1b1!16s%2Fg%2F11gh2t0js2?entry=ttu&g_ep=EgoyMDI2MTAxOS4wIKXMDSoASAFQAw%3D%3D",
+    "gid": "290090319",
+    "tagline": "Comprehensive defence academy focusing on SSB interviews & fitness",
+    "rating": "4.9",
+    "totalReviews": "809"
+  },
+  {
+    "id": "titan_nda",
+    "name": "Titan NDA Academy",
+    "mapUrl": "https://www.google.com/maps/place/Titan+NDA+Academy/@18.492002,73.8431482,17z/data=!3m1!4b1!4m6!3m5!1s0x3bc2c1cf071e01ad:0x211a965b101808cd!8m2!3d18.492002!4d73.8457231!9m1!1b1?entry=ttu",
+    "gid": "885715312",
+    "tagline": "Elite NDA preparation academy with dedicated mentors & SSB guidance",
+    "rating": "4.8",
+    "totalReviews": "21"
+  },
+  {
+    "id": "dignitary_nda",
+    "name": "Dignitary NDA Academy",
+    "mapUrl": "https://www.google.com/maps/place/Dignitary+NDA+Academy/@18.4696147,73.8506526,17z/data=!4m10!1m2!2m1!1sDignitary+NDA+Academy+Pune!3m6!1s0x3bc2ebfaf0b6a341:0xa392ec1cb1d0b63b!8m2!3d18.4694217!4d73.8531131!9m1!1b1?entry=ttu",
+    "gid": "0",
+    "tagline": "Premier NDA training with classroom instruction & physical preparation",
+    "rating": "4.9",
+    "totalReviews": "64"
+  },
+  {
+    "id": "nda_career",
+    "name": "NDA Career Consultant",
+    "mapUrl": "https://www.google.com/maps/place/NDA+Career+Consultant/@18.4821292,73.893383,17z/data=!3m1!4b1!4m6!3m5!1s0x3bc2ebe0a1c22503:0x2f84e68b7ccddd0d!8m2!3d18.4821292!4d73.8959579!9m1!1b1?entry=ttu",
+    "gid": "1049383910",
+    "tagline": "Career counselling and strategic pathway planning for defence services",
+    "rating": "5.0",
+    "totalReviews": "28"
+  }
+]
