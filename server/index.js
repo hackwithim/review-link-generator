@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+
 import dotenv from 'dotenv';
 import { initDatabase, db } from './db/nosql.js';
 import { authenticateUser, createToken, verifyToken, requireAuth } from './auth.js';
@@ -329,11 +331,22 @@ app.get('/api/activity', requireAuth, async (req, res) => {
 // FRONTEND SERVING (Production)
 // =====================================================================
 const distPath = path.join(__dirname, '..', 'dist');
-app.use(express.static(distPath));
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.use((req, res) => {
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(503).send('Application bundle is compiling. Please run "npm run build".');
+    }
+  });
+} else {
+  app.use((req, res) => {
+    res.status(503).send('Production build not found. Please run "npm run build" to build client assets.');
+  });
+}
 
-app.use((req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
 
 // Start Server
 app.listen(PORT, () => {
