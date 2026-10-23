@@ -69,7 +69,14 @@ export default function Header({
           >
             <span>📑 Master Sheet ({totalReviews})</span>
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
+            onClick={() => setActiveTab('activity')}
+          >
+            <span>📋 Copied & Submissions Log</span>
+          </button>
         </nav>
+
       </div>
     </header>
   );

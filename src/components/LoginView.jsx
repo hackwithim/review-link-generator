@@ -7,12 +7,6 @@ export default function LoginView({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleQuickFill = () => {
-    setUsername('admin');
-    setPassword('admin@webworks');
-    setError('');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password) {
@@ -38,7 +32,7 @@ export default function LoginView({ onLoginSuccess }) {
 
       onLoginSuccess(data.token, data.user);
     } catch (err) {
-      setError(err.message || 'Authentication failed. Please verify credentials.');
+      setError(err.message || 'Authentication failed. Please check credentials.');
     } finally {
       setLoading(false);
     }
@@ -65,7 +59,7 @@ export default function LoginView({ onLoginSuccess }) {
           </div>
           <h1 className="login-title">ReviewFlow Studio</h1>
           <p className="login-subtitle">
-            Enterprise Link Management & Review Flow Console. Please authenticate to access dashboard operations.
+            Enterprise Link Management & Review Operations. Please authenticate to access the admin dashboard.
           </p>
         </div>
 
@@ -94,7 +88,7 @@ export default function LoginView({ onLoginSuccess }) {
                 id="username"
                 type="text"
                 className="login-input"
-                placeholder="e.g. admin"
+                placeholder="Enter admin username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
@@ -145,7 +139,7 @@ export default function LoginView({ onLoginSuccess }) {
             {loading ? (
               <>
                 <span className="login-spinner"></span>
-                <span>Authenticating...</span>
+                <span>Verifying Credentials...</span>
               </>
             ) : (
               <>
@@ -156,30 +150,12 @@ export default function LoginView({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* Quick Demo Access Bar */}
-        <div className="demo-credentials-box">
-          <div className="demo-header">
-            <span className="demo-pill">DEFAULT ADMIN</span>
-            <button
-              type="button"
-              className="btn-quick-fill"
-              onClick={handleQuickFill}
-            >
-              ⚡ Quick Fill
-            </button>
-          </div>
-          <div className="demo-creds-details">
-            <div>User: <code>admin</code></div>
-            <div>Pass: <code>admin@webworks</code></div>
-          </div>
-        </div>
-
-        {/* Footer Guarantee */}
+        {/* Footer Security Notice */}
         <div className="login-footer-notice">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
-          <span>Recipient review links (`?r=...`) remain public & friction-free.</span>
+          <span>Protected by 256-Bit Authentication • Customer review links bypass login</span>
         </div>
       </div>
     </div>

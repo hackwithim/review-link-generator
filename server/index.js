@@ -95,12 +95,51 @@ app.get('/api/reviews/next/:accountId', async (req, res) => {
   }
 });
 
+// POST Record Review Copied Event (Public for recipient telemetry)
+app.post('/api/reviews/copy-event', async (req, res) => {
+  try {
+    const { reviewId, reviewText, accountId, trigger = 'auto' } = req.body;
+
+    // 1. Log in activity_logs
+    const logEntry = await db.insertOne('activity_logs', {
+      type: 'copied',
+      trigger, // 'auto' | 'manual' | 'submit'
+      reviewId: reviewId || null,
+      reviewText: (reviewText || '').slice(0, 300),
+      accountId: accountId || '',
+      timestamp: new Date(),
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    // 2. Update review metadata in NoSQL database
+    if (reviewId) {
+      const existing = await db.findOne('reviews', { id: reviewId });
+      if (existing) {
+        await db.updateOne('reviews', { id: reviewId }, {
+          lastCopiedAt: new Date(),
+          copyCount: (existing.copyCount || 0) + 1,
+          status: existing.isPosted ? 'Submitted' : 'Copied'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Review copy event recorded',
+      logId: logEntry._id
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST Record Review Submission (Public for recipient submission)
 app.post('/api/reviews/submit', async (req, res) => {
   try {
     const { reviewId, reviewText, accountId } = req.body;
 
-    // 1. Log submission record in NoSQL collection
+    // 1. Log submission record in submissions collection
     const submissionRecord = await db.insertOne('submissions', {
       reviewId: reviewId || null,
       reviewText: reviewText || '',
@@ -110,14 +149,30 @@ app.post('/api/reviews/submit', async (req, res) => {
       userAgent: req.headers['user-agent']
     });
 
-    // 2. Mark review as submitted
+    // 2. Also record in activity_logs
+    await db.insertOne('activity_logs', {
+      type: 'submitted',
+      reviewId: reviewId || null,
+      reviewText: (reviewText || '').slice(0, 300),
+      accountId: accountId || '',
+      timestamp: new Date(),
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    // 3. Mark review as submitted
+    const updatePayload = {
+      isPosted: true,
+      status: 'Submitted',
+      submittedAt: new Date()
+    };
     if (reviewId) {
-      await db.updateOne('reviews', { id: reviewId }, { isPosted: true, status: 'Submitted' });
+      await db.updateOne('reviews', { id: reviewId }, updatePayload);
     } else if (reviewText) {
-      await db.updateOne('reviews', { review: reviewText }, { isPosted: true, status: 'Submitted' });
+      await db.updateOne('reviews', { review: reviewText }, updatePayload);
     }
 
-    // 3. Find next review
+    // 4. Find next review
     let nextReview = null;
     let remainingUnposted = 0;
     if (accountId) {
@@ -138,6 +193,7 @@ app.post('/api/reviews/submit', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // =====================================================================
 // PROTECTED DASHBOARD ROUTES (Require Admin Token)
@@ -255,6 +311,19 @@ app.post('/api/links/generate', requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET Live Activity Logs (Requires Auth)
+app.get('/api/activity', requireAuth, async (req, res) => {
+  try {
+    const logs = await db.find('activity_logs');
+    // Sort newest first
+    logs.sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt));
+    res.json(logs.slice(0, 50));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // =====================================================================
 // FRONTEND SERVING (Production)

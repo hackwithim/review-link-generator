@@ -23,6 +23,7 @@ export default function DatabaseView({
   const filtered = reviews.filter(r => {
     if (filterAccount !== 'all' && r.accountId !== filterAccount) return false;
     if (filterStatus === 'unposted' && r.isPosted) return false;
+    if (filterStatus === 'copied' && (r.isPosted || r.status !== 'Copied')) return false;
     if (filterStatus === 'posted' && !r.isPosted) return false;
     if (filterLang !== 'all' && r.language !== filterLang) return false;
     if (search.trim()) {
@@ -34,6 +35,7 @@ export default function DatabaseView({
     }
     return true;
   });
+
 
   const totalFiltered = filtered.length;
   const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
@@ -102,6 +104,7 @@ export default function DatabaseView({
             >
               <option value="all">All Statuses</option>
               <option value="unposted">🟢 Unposted Only</option>
+              <option value="copied">🟡 Copied Only</option>
               <option value="posted">🔵 Submitted/Posted Only</option>
             </select>
 
@@ -156,8 +159,8 @@ export default function DatabaseView({
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${r.isPosted ? 'badge-indigo' : 'badge-emerald'}`}>
-                          {r.status || (r.isPosted ? 'Submitted' : 'Not Posted')}
+                        <span className={`badge ${r.status === 'Submitted' || r.isPosted ? 'badge-emerald' : r.status === 'Copied' ? 'badge-amber' : 'badge-indigo'}`}>
+                          {r.status === 'Submitted' ? '✅ Submitted' : r.status === 'Copied' ? '📋 Copied' : (r.isPosted ? '✅ Posted' : '🟢 Unposted')}
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>

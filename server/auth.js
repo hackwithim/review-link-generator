@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'webworks-super-secret-key-2026';
-const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'admin@webworks';
+const ADMIN_USER = (process.env.ADMIN_USERNAME || 'review_admin').trim();
+const ADMIN_PASS = (process.env.ADMIN_PASSWORD || 'WebWorks@Admin2026!').trim();
 
 // Create a secure signed token
 export function createToken(payload) {
@@ -34,7 +34,10 @@ export function verifyToken(token) {
 
 // Validate credentials
 export function authenticateUser(username, password) {
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
+  const normalizedUser = (username || '').trim().toLowerCase();
+  const targetUser = ADMIN_USER.toLowerCase();
+
+  if (normalizedUser === targetUser && password === ADMIN_PASS) {
     return {
       username: ADMIN_USER,
       role: 'admin',

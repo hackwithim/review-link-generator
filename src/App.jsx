@@ -6,6 +6,7 @@ import GeneratorView from './components/GeneratorView.jsx';
 import DatabaseView from './components/DatabaseView.jsx';
 import RecipientView from './components/RecipientView.jsx';
 import LoginView from './components/LoginView.jsx';
+import ActivityLogView from './components/ActivityLogView.jsx';
 
 // UTF-8 safe base64 encoding & decoding
 export function encodePayload(obj) {
@@ -42,7 +43,7 @@ export default function App() {
   const [currentReviewText, setCurrentReviewText] = useState('');
   const [customReviewInput, setCustomReviewInput] = useState('');
   const [redirectUrl, setRedirectUrl] = useState('https://webworksstudios.com/');
-  const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'database'
+  const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'database' | 'activity'
   const [toast, setToast] = useState(null);
   const [recipientPayload, setRecipientPayload] = useState(null);
   const [isRecipientMode, setIsRecipientMode] = useState(false);
@@ -73,12 +74,13 @@ export default function App() {
     showToast('Dashboard locked. Session terminated safely.', '🔒');
   }, []);
 
-  // Fetch accounts from Node + NoSQL API with Auth
+  // Fetch accounts and reviews from Node + NoSQL API with Auth
   const refreshFromBackend = useCallback(async (tokenToUse) => {
     const activeToken = tokenToUse || authToken;
     if (!activeToken) return;
 
     try {
+      // 1. Refresh Accounts with live unposted counters
       const accRes = await fetch('/api/accounts', {
         headers: {
           'Authorization': `Bearer ${activeToken}`,
@@ -96,10 +98,25 @@ export default function App() {
           setAccounts(accData);
         }
       }
+
+      // 2. Refresh Reviews so submitted / copied statuses update in real time
+      const revRes = await fetch('/api/reviews?limit=2000', {
+        headers: {
+          'Authorization': `Bearer ${activeToken}`,
+        },
+      });
+
+      if (revRes.ok) {
+        const revData = await revRes.json();
+        if (revData && Array.isArray(revData.reviews)) {
+          setReviews(revData.reviews);
+        }
+      }
     } catch (e) {
       // Backend offline, fallback to local state
     }
   }, [authToken, handleLogout]);
+
 
   // Handle successful login
   const handleLoginSuccess = (token, user) => {
@@ -200,6 +217,16 @@ export default function App() {
       refreshFromBackend(authToken);
     }
   }, [authToken, refreshFromBackend]);
+
+  // Real-time Live Polling: Auto-reflects submissions & copy events every 4s
+  useEffect(() => {
+    if (!authToken || isRecipientMode) return;
+    const pollInterval = setInterval(() => {
+      refreshFromBackend(authToken);
+    }, 4000);
+    return () => clearInterval(pollInterval);
+  }, [authToken, isRecipientMode, refreshFromBackend]);
+
 
   // Update current review whenever account or mode changes
   useEffect(() => {
@@ -313,7 +340,7 @@ export default function App() {
       />
 
       <main className="app-main">
-        {activeTab === 'generator' ? (
+        {activeTab === 'generator' && (
           <GeneratorView
             accounts={accounts}
             reviews={reviews}
@@ -335,7 +362,9 @@ export default function App() {
             onAdvanceQueue={handleAdvanceQueue}
             showToast={showToast}
           />
-        ) : (
+        )}
+
+        {activeTab === 'database' && (
           <DatabaseView
             accounts={accounts}
             reviews={reviews}
@@ -349,7 +378,16 @@ export default function App() {
             showToast={showToast}
           />
         )}
+
+        {activeTab === 'activity' && (
+          <ActivityLogView
+            accounts={accounts}
+            authToken={authToken}
+            showToast={showToast}
+          />
+        )}
       </main>
+
 
       {/* Floating Toast Notification */}
       {toast && (

@@ -3948,11 +3948,15 @@
       "accountId": "dignitary_defence",
       "accountName": "Dignitary Defence Academy",
       "review": "I joined Dignitary Defence Academy mainly to improve my physical fitness. The regular exercise sessions have helped me become more active and disciplined. Running, endurance training and drill practice are all part of the routine.",
-      "status": "Not Posted",
-      "isPosted": false,
+      "status": "Submitted",
+      "isPosted": true,
       "existingLink": "",
       "date": "",
-      "language": "Hinglish"
+      "language": "Hinglish",
+      "lastCopiedAt": "2026-10-23T06:37:55.052Z",
+      "copyCount": 1,
+      "updatedAt": "2026-10-23T06:37:55.092Z",
+      "submittedAt": "2026-10-23T06:37:55.092Z"
     },
     {
       "id": "dignitary_defence_2",
@@ -13611,7 +13615,39 @@
       "ip": "::1",
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
       "createdAt": "2026-10-23T05:45:40.270Z"
+    },
+    {
+      "reviewId": "dignitary_defence_1",
+      "reviewText": "Dignitary Defence Academy provides excellent guidance.",
+      "accountId": "dignitary_defence",
+      "submittedAt": "2026-10-23T06:37:55.072Z",
+      "ip": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-23T06:37:55.072Z"
     }
   ],
-  "links": []
+  "links": [],
+  "activity_logs": [
+    {
+      "type": "copied",
+      "trigger": "manual_button",
+      "reviewId": "dignitary_defence_1",
+      "reviewText": "Dignitary Defence Academy provides excellent guidance.",
+      "accountId": "dignitary_defence",
+      "timestamp": "2026-10-23T06:37:55.039Z",
+      "ip": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-23T06:37:55.039Z"
+    },
+    {
+      "type": "submitted",
+      "reviewId": "dignitary_defence_1",
+      "reviewText": "Dignitary Defence Academy provides excellent guidance.",
+      "accountId": "dignitary_defence",
+      "timestamp": "2026-10-23T06:37:55.081Z",
+      "ip": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-23T06:37:55.081Z"
+    }
+  ]
 }
